@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Characters/BaseCharacter.h"
+#include "Interfaces/IPickupInterface.h"
 #include "InputActionValue.h"
 #include "Characters/CharacterStates.h"
 #include "PlayerCharacter.generated.h"
@@ -12,9 +13,10 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
+class ABaseWeapon;
 
 UCLASS()
-class FPIDEAS_API APlayerCharacter : public ABaseCharacter
+class FPIDEAS_API APlayerCharacter : public ABaseCharacter, public IIPickupInterface
 {
 	GENERATED_BODY()
 
@@ -22,6 +24,7 @@ public:
 	APlayerCharacter();
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	virtual void Jump() override;
+	virtual void SetWeaponLookedAt(ABaseWeapon* Weapon) override;
 
 	virtual void Tick(float DeltaTime) override;
 
@@ -39,8 +42,12 @@ protected:
 	void FinishedSprint();
 	void EKeyPressed();
 
-	bool CanSprint();
+	void InteractionTrace(FHitResult& SphereHitResult);
 
+	bool CanSprint();
+	
+
+	/* Input Actions */
 	UPROPERTY(EditAnywhere, Category = "Input")
 	TObjectPtr<UInputMappingContext> FPContext;
 
@@ -65,6 +72,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Input")
 	TObjectPtr<UInputAction> EKeyPressedAction;
 
+	/* Movement Variables */
 	UPROPERTY(EditAnywhere, Category = "Movement")
 	float CrouchHeight = 50.f;
 
@@ -80,7 +88,29 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, Category = "Movement")
 	uint8 JumpCounter = 0;
 
+	UPROPERTY(VisibleInstanceOnly)
 	bool bIsMidair = false;
+
+	/* Weapon Variables */
+	bool bIsHoldingWeapon = false;
+	bool bHasPowerWeapon = false;
+
+	UPROPERTY(VisibleInstanceOnly)
+	TObjectPtr<ABaseWeapon> WeaponInView;
+	FName WeaponClass;
+
+	/* Interaction Variables */
+	FHitResult InteractionHit;
+	TArray<AActor*> ActorsToIgnore;
+
+	UPROPERTY(EditAnywhere, Category = "Interaction")
+	float InteractRange = 100.f;
+
+	UPROPERTY(EditAnywhere, Category = "Interaction")
+	float CrosshairRadius = 50.f;
+
+	UPROPERTY(EditAnywhere, Category = "Interaction")
+	bool bShowInteractionDebug = false;
 
 private:
 
@@ -93,6 +123,14 @@ private:
 
 	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = "Montages", meta = (AllowPrivateAccess = "true"))
 	ECharacterState CharacterState = ECharacterState::ECS_Idle;
+
+	EWeaponHeld WeaponHeld = EWeaponHeld::EWH_None;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	FName WeaponSocket;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	FName PowerSocket;
 
 	TObjectPtr<USkeletalMeshComponent> PlayerMesh;
 

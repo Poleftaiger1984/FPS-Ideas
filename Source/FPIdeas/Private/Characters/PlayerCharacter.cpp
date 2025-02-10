@@ -4,8 +4,13 @@
 #include "Characters/PlayerCharacter.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/AttributesComponent.h"
+#include "Interfaces/InteractionInterface.h"
+#include "Items/BaseItem.h"
+#include "Weapons/BaseWeapon.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 #include "Components/InputComponent.h"
 #include "EnhancedInputComponent.h"
@@ -19,6 +24,7 @@ APlayerCharacter::APlayerCharacter()
 	bUseControllerRotationRoll = false;
 	GetCharacterMovement()->AirControl = 1.f;
 	GetCharacterMovement()->AirControlBoostMultiplier = 10000.f;
+	GetCharacterMovement()->FallingLateralFriction = 1.f;
 
 	//Control rotation of character with the camera
 	GetCharacterMovement()->bOrientRotationToMovement = false;
@@ -78,18 +84,23 @@ void APlayerCharacter::Jump()
 {
 	Super::Jump();
 
-	if (JumpCounter == 1)
+	if (bIsMidair && JumpCounter == 1)
 	{
 		GetCharacterMovement()->Velocity.Z = FMath::Max<FVector::FReal>(GetCharacterMovement()->Velocity.Z, GetCharacterMovement()->JumpZVelocity);
 		JumpCounter = 2;
-		UE_LOG(LogTemp, Warning, TEXT("kek"));
 	}
+}
 
+void APlayerCharacter::SetWeaponLookedAt(ABaseWeapon* Weapon)
+{
+	WeaponInView = Weapon;
 }
 
 void APlayerCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	InteractionTrace(InteractionHit);
 
 	if (PlayerMesh && FirstPersonCamera)
 	{
@@ -120,13 +131,11 @@ void APlayerCharacter::StaminaHandler(float DeltaTime)
 	if ((GetCharacterMovement()->Velocity.X == 0 || GetCharacterMovement()->Velocity.Y == 0 || GetCharacterMovement()->MaxWalkSpeed == WalkSpeed) && Attributes && Attributes->GetStamina() < Attributes->GetMaxStamina() && CharacterState != ECharacterState::ECS_Sprinting)
 	{
 		Attributes->RegenStamina(DeltaTime);
-		UE_LOG(LogTemp, Warning, TEXT("Regening"));
 	}
 
 	if ((GetCharacterMovement()->Velocity.X != 0 || GetCharacterMovement()->Velocity.Y != 0) && Attributes && Attributes->GetStamina() > Attributes->GetSprintCost() && CharacterState == ECharacterState::ECS_Sprinting)
 	{
 		Attributes->UseStamina(Attributes->GetSprintCost(), DeltaTime);
-		UE_LOG(LogTemp, Warning, TEXT("%f"), Attributes->GetStamina());
 	}
 
 	if (Attributes && Attributes->GetStamina() < Attributes->GetSprintCost() && CharacterState == ECharacterState::ECS_Sprinting)
@@ -192,7 +201,10 @@ void APlayerCharacter::Crouch()
 
 void APlayerCharacter::Attack()
 {
+	if (bIsHoldingWeapon || bHasPowerWeapon)
+	{
 
+	}
 }
 
 void APlayerCharacter::Sprint()
@@ -225,6 +237,53 @@ void APlayerCharacter::FinishedSprint()
 
 void APlayerCharacter::EKeyPressed()
 {
+	IInteractionInterface* InteractionInterface = Cast<IInteractionInterface>(InteractionHit.GetActor());
+	if (InteractionInterface) //We have an item in view
+	{
+		ABaseWeapon* Weapon = Cast<ABaseWeapon>(InteractionHit.GetActor()); //We have a weapon in view
+		if (Weapon)
+		{
+			//WeaponClass = Weapon->Tag
+			if (!bIsHoldingWeapon && !Weapon->ActorHasTag("Power"))
+			{
+				bIsHoldingWeapon = true;
+				Weapon->Equip(GetMesh(), FName(WeaponSocket), this, this);
+				WeaponInView = nullptr;
+				ActorsToIgnore.Add(Weapon);
+				HeldWeapon = Weapon;
+
+				if (HeldWeapon->ActorHasTag("HitScan"))
+				{
+					WeaponHeld = EWeaponHeld::EWH_HitScan;
+				}
+				if (HeldWeapon->ActorHasTag("Projectile"))
+				{
+					WeaponHeld = EWeaponHeld::EWH_Projectile;
+				}
+				if (HeldWeapon->ActorHasTag("Melee"))
+				{
+					WeaponHeld = EWeaponHeld::EWH_Melee;
+				}
+			}
+			
+			if (!bHasPowerWeapon && Weapon->ActorHasTag("Power"))
+			{
+				bHasPowerWeapon = true;
+				Weapon->Equip(GetMesh(), FName(PowerSocket), this, this);
+				WeaponInView = nullptr;
+				ActorsToIgnore.Add(Weapon);
+			}
+		}
+	}
+	
+}
+
+void APlayerCharacter::InteractionTrace(FHitResult& SphereHitResult)
+{
+	const FVector Start = FirstPersonCamera->GetComponentLocation();
+	const FVector End = Start + (FirstPersonCamera->GetForwardVector() * InteractRange);
+
+	UKismetSystemLibrary::SphereTraceSingle(this, Start, End, CrosshairRadius, ETraceTypeQuery::TraceTypeQuery1, false, ActorsToIgnore, bShowInteractionDebug ? EDrawDebugTrace::ForDuration : EDrawDebugTrace::None, SphereHitResult, true);
 }
 
 bool APlayerCharacter::CanSprint()

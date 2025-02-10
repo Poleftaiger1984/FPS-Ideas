@@ -7,6 +7,7 @@
 #include "BaseCharacter.generated.h"
 
 class UAttributesComponent;
+class ABaseWeapon;
 
 UCLASS()
 class FPIDEAS_API ABaseCharacter : public ACharacter
@@ -22,6 +23,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UAttributesComponent> Attributes;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<ABaseWeapon> HeldWeapon; //Reference to currently held weapon
 
 private:
 };
