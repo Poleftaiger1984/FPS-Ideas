@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
+#include "Characters/CharacterStates.h"
 #include "IPickupInterface.generated.h"
 
 // This class does not need to be modified.
@@ -22,6 +23,5 @@ class FPIDEAS_API IIPickupInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	UFUNCTION()
-	virtual void SetWeaponLookedAt(class ABaseWeapon* Weapon);
+	virtual void SetWeaponLookedAt(TObjectPtr<class ABaseWeapon> Weapon);
 };

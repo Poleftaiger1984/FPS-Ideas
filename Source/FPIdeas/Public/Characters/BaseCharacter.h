@@ -4,13 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Interfaces/HitInterface.h"
 #include "BaseCharacter.generated.h"
 
 class UAttributesComponent;
 class ABaseWeapon;
 
 UCLASS()
-class FPIDEAS_API ABaseCharacter : public ACharacter
+class FPIDEAS_API ABaseCharacter : public ACharacter, public IHitInterface
 {
 	GENERATED_BODY()
 

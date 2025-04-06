@@ -21,4 +21,11 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	TObjectPtr<UStaticMeshComponent> ItemMesh;
+
+	UPROPERTY(EditAnywhere, Category = "Item Properties")
+	FName ItemName;
+
+public:
+	FORCEINLINE TObjectPtr<UStaticMeshComponent> GetItemMesh() const { return ItemMesh; }
+	FORCEINLINE FName GetItemName() const { return ItemName; }
 };

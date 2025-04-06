@@ -11,6 +11,9 @@ ABaseItem::ABaseItem()
 	ItemMesh->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 	ItemMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
 	RootComponent = ItemMesh;
+
+	ItemMesh->SetSimulatePhysics(false);
+	ItemName = "Default";
 }
 
 void ABaseItem::Tick(float DeltaTime)

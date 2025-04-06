@@ -2,12 +2,12 @@
 
 
 #include "Components/AttributesComponent.h"
+#include "Characters/CharacterStates.h"
 
 UAttributesComponent::UAttributesComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 }
-
 
 void UAttributesComponent::BeginPlay()
 {
@@ -28,5 +28,29 @@ void UAttributesComponent::UseStamina(float StaminaCost, float DeltaTime)
 void UAttributesComponent::RegenStamina(float DeltaTime)
 {
 	Stamina = FMath::Clamp(Stamina + StaminaRegenRate * DeltaTime, 0.f, MaxStamina);
+}
+
+void UAttributesComponent::AddBoost(EBoostType TypeOfBoost, float BoostAmount)
+{
+	switch (TypeOfBoost)
+	{
+		case EBoostType::EBT_Health:
+		{
+			Health += BoostAmount;
+			break;
+		}
+		case EBoostType::EBT_Stamina:
+		{
+			Stamina += BoostAmount;
+			break;
+		}
+		case EBoostType::EBT_Money:
+		{
+			Money += BoostAmount;
+			break;
+		}
+		default:
+			break;
+	}
 }
 

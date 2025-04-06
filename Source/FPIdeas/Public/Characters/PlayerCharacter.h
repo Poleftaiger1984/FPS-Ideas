@@ -14,6 +14,8 @@ class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
 class ABaseWeapon;
+class IWeaponInterface;
+class ABaseItem;
 
 UCLASS()
 class FPIDEAS_API APlayerCharacter : public ABaseCharacter, public IIPickupInterface
@@ -24,7 +26,7 @@ public:
 	APlayerCharacter();
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	virtual void Jump() override;
-	virtual void SetWeaponLookedAt(ABaseWeapon* Weapon) override;
+	virtual void SetWeaponLookedAt(TObjectPtr<ABaseWeapon> Weapon) override;
 
 	virtual void Tick(float DeltaTime) override;
 
@@ -38,11 +40,13 @@ protected:
 	void Look(const FInputActionValue& Value);
 	void Crouch();
 	void Attack();
+	void PowerAttack();
 	void Sprint();
 	void FinishedSprint();
 	void EKeyPressed();
 
 	void InteractionTrace(FHitResult& SphereHitResult);
+	void SetItemLookedAt(FHitResult& LookTraceResult);
 
 	bool CanSprint();
 	
@@ -67,6 +71,9 @@ protected:
 	TObjectPtr<UInputAction> AttackAction;
 
 	UPROPERTY(EditAnywhere, Category = "Input")
+	TObjectPtr<UInputAction> PowerAttackAction;
+
+	UPROPERTY(EditAnywhere, Category = "Input")
 	TObjectPtr<UInputAction> SprintAction;
 
 	UPROPERTY(EditAnywhere, Category = "Input")
@@ -85,6 +92,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Movement")
 	float SprintSpeed = 1200.f;
 
+	UPROPERTY(EditAnywhere, Category = "Movement")
+	float DashSpeed = 7000.f;
+
 	UPROPERTY(VisibleInstanceOnly, Category = "Movement")
 	uint8 JumpCounter = 0;
 
@@ -95,12 +105,17 @@ protected:
 	bool bIsHoldingWeapon = false;
 	bool bHasPowerWeapon = false;
 
+	UPROPERTY(VisibleInstanceOnly, Category = "Combat")
+	TObjectPtr<ABaseWeapon> HeldPowerWeapon;
+
 	UPROPERTY(VisibleInstanceOnly)
-	TObjectPtr<ABaseWeapon> WeaponInView;
-	FName WeaponClass;
+	TObjectPtr<ABaseItem> ItemInView;
+
+	IWeaponInterface* WeaponInterface;
 
 	/* Interaction Variables */
 	FHitResult InteractionHit;
+	TObjectPtr<AActor> LastSeenActor;
 	TArray<AActor*> ActorsToIgnore;
 
 	UPROPERTY(EditAnywhere, Category = "Interaction")
@@ -112,6 +127,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Interaction")
 	bool bShowInteractionDebug = false;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction")
+	TObjectPtr<USceneComponent> ComponentToEquipTo;
+
 private:
 
 	/* Character Components */
@@ -122,16 +140,13 @@ private:
 	TObjectPtr<UCameraComponent> FirstPersonCamera;
 
 	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = "Montages", meta = (AllowPrivateAccess = "true"))
-	ECharacterState CharacterState = ECharacterState::ECS_Idle;
+	ECharacterState CharacterState;
 
-	EWeaponHeld WeaponHeld = EWeaponHeld::EWH_None;
+	EWeaponHeld WeaponClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
 	FName WeaponSocket;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
 	FName PowerSocket;
-
-	TObjectPtr<USkeletalMeshComponent> PlayerMesh;
-
 };

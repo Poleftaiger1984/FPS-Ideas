@@ -3,6 +3,10 @@
 
 #include "Weapons/Melee.h"
 
+void AMelee::AttackTriggered()
+{
+}
+
 void AMelee::BeginPlay()
 {
 	Super::BeginPlay();

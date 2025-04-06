@@ -20,18 +20,31 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	void Equip(TObjectPtr<USceneComponent> ComponentToEquipTo, FName RightHandSocket, TObjectPtr<AActor> NewOwner, TObjectPtr<APawn> NewInstigator);
 	void Unequip();
-	void AttackMeshToSocket(TObjectPtr<USceneComponent> MeshToAttachTo, const FName EquipSocket);
-
+	void AttachMeshToSocket(TObjectPtr<USceneComponent> MeshToAttachTo, const FName EquipSocket);
 
 protected:
 	virtual void BeginPlay() override;
+	void ExecuteGetHit(FHitResult& TraceResult);
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void CreateFields(const FVector& FieldLocation);
 
 	UPROPERTY(EditAnywhere, Category="Combat")
 	float Damage = 20.f;
 
+	UPROPERTY(EditAnywhere, Category = "Combat")
+	float AttackRange = 1000.f;
+
 	UPROPERTY(EditAnywhere, Category = "Montages")
 	TObjectPtr<UAnimMontage> AttackMontage;
 
+	UPROPERTY(EditAnywhere, Category = "Interaction")
+	FName GripSocket;
+
+	UPROPERTY(EditAnywhere, Category = "Interaction")
+	FName SecondaryGripSocket;
+
 public:
+	FORCEINLINE FName GetGripSocket() const { return GripSocket; }
 
 };

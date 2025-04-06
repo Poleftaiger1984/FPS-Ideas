@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "AttributesComponent.generated.h"
 
+enum class EBoostType : uint8;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class FPIDEAS_API UAttributesComponent : public UActorComponent
@@ -18,6 +19,7 @@ public:
 
 	void UseStamina(float StaminaCost, float DeltaTime);
 	void RegenStamina(float DeltaTime);
+	void AddBoost(EBoostType TypeOfBoost, float BoostAmount);
 
 protected:
 	virtual void BeginPlay() override;
@@ -41,11 +43,16 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Actor Attributes")
 	float StaminaRegenRate = 8.f;
 
+	UPROPERTY(EditAnywhere, Category = "Actor Attributes")
+	float Money = 0.f;
+
 public:
 	FORCEINLINE float GetHealthPercent() const { return Health / MaxHealth; }
 	FORCEINLINE float GetStaminaPercent() const { return Stamina / MaxStamina; }
 	FORCEINLINE float GetSprintCost() const { return SprintCost; }
 	FORCEINLINE float GetStamina() const { return Stamina; }
 	FORCEINLINE float GetMaxStamina() const { return MaxStamina; }
+	FORCEINLINE float GetMoney() const { return Money; }
 
 };
+

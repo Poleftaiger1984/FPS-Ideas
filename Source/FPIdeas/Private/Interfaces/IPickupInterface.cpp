@@ -5,6 +5,6 @@
 
 // Add default functionality here for any IIPickupInterface functions that are not pure virtual.
 
-void IIPickupInterface::SetWeaponLookedAt(ABaseWeapon* Weapon)
+void IIPickupInterface::SetWeaponLookedAt(TObjectPtr<class ABaseWeapon> Weapon)
 {
 }

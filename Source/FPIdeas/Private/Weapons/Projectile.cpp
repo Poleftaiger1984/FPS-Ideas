@@ -3,6 +3,11 @@
 
 #include "Weapons/Projectile.h"
 
+void AProjectile::AttackTriggered()
+{
+
+}
+
 void AProjectile::BeginPlay()
 {
 	Super::BeginPlay();

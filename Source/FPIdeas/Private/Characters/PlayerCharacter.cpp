@@ -3,13 +3,14 @@
 
 #include "Characters/PlayerCharacter.h"
 #include "Camera/CameraComponent.h"
-#include "GameFramework/SpringArmComponent.h"
-#include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/AttributesComponent.h"
 #include "Interfaces/InteractionInterface.h"
+#include "Interfaces/WeaponInterface.h"
 #include "Items/BaseItem.h"
 #include "Weapons/BaseWeapon.h"
+#include "Items/Pickups.h"
+#include "Items/SimpleInteractable.h"
 #include "Kismet/KismetSystemLibrary.h"
 
 #include "Components/InputComponent.h"
@@ -17,36 +18,24 @@
 #include "EnhancedInputSubsystems.h"
 
 APlayerCharacter::APlayerCharacter()
+	: WeaponClass(EWeaponHeld::EWH_None), CharacterState(ECharacterState::ECS_Idle)
 {
 	PrimaryActorTick.bCanEverTick = true;
-	bUseControllerRotationYaw = true;
-	bUseControllerRotationPitch = true;
+	bUseControllerRotationYaw = false;
+	bUseControllerRotationPitch = false;
 	bUseControllerRotationRoll = false;
+
 	GetCharacterMovement()->AirControl = 1.f;
 	GetCharacterMovement()->AirControlBoostMultiplier = 10000.f;
 	GetCharacterMovement()->FallingLateralFriction = 1.f;
 
 	//Control rotation of character with the camera
-	GetCharacterMovement()->bOrientRotationToMovement = false;
-	//GetCharacterMovement()->RotationRate = FRotator(0.f, 400.f, 0.f);
-
-	//Setup collision responses
-	GetMesh()->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
-	GetMesh()->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
-	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
-	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_WorldDynamic, ECollisionResponse::ECR_Overlap);
-	GetMesh()->SetGenerateOverlapEvents(true);
-
-	//Components
-	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
-	CameraBoom->SetupAttachment(GetRootComponent());
-	CameraBoom->TargetArmLength = 50.f;
-	CameraBoom->bUsePawnControlRotation = false;
+	GetCharacterMovement()->bOrientRotationToMovement = true;
 
 	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("First Person Camera"));
-	FirstPersonCamera->SetupAttachment(CameraBoom);
-	
-	PlayerMesh = GetMesh();
+	FirstPersonCamera->bUsePawnControlRotation = true;
+	FirstPersonCamera->SetupAttachment(GetRootComponent());
+
 }
 
 void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -68,7 +57,10 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Completed, this, &APlayerCharacter::Crouch);
 
 		//Attacking
-		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Attack);
+		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &APlayerCharacter::Attack);
+
+		//Power Attack
+		EnhancedInputComponent->BindAction(PowerAttackAction, ETriggerEvent::Started, this, &APlayerCharacter::PowerAttack);
 
 		//Sprinting
 		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Started, this, &APlayerCharacter::Sprint);
@@ -91,23 +83,15 @@ void APlayerCharacter::Jump()
 	}
 }
 
-void APlayerCharacter::SetWeaponLookedAt(ABaseWeapon* Weapon)
+void APlayerCharacter::SetWeaponLookedAt(TObjectPtr<ABaseWeapon> Weapon)
 {
-	WeaponInView = Weapon;
 }
 
 void APlayerCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	InteractionTrace(InteractionHit);
-
-	if (PlayerMesh && FirstPersonCamera)
-	{
-		FRotator CameraRotation = FirstPersonCamera->GetComponentRotation();
-		PlayerMesh->SetWorldRotation(CameraRotation);
-	}
-	
+	InteractionTrace(InteractionHit);	
 	StaminaHandler(DeltaTime);
 
 	if (GetVelocity().Z != 0)
@@ -185,15 +169,15 @@ void APlayerCharacter::Look(const FInputActionValue& Value)
 
 void APlayerCharacter::Crouch()
 {
-	if (CameraBoom && CharacterState != ECharacterState::ECS_Crouching)
+	if (FirstPersonCamera && CharacterState != ECharacterState::ECS_Crouching)
 	{
-		CameraBoom->AddWorldOffset(FVector(0.f, 0.f, -CrouchHeight));
+		FirstPersonCamera->AddWorldOffset(FVector(0.f, 0.f, -CrouchHeight));
 		CharacterState = ECharacterState::ECS_Crouching;
 		GetCharacterMovement()->MaxWalkSpeed = CrouchWalkSpeed;
 	}
-	else if (CameraBoom && CharacterState == ECharacterState::ECS_Crouching)
+	else if (FirstPersonCamera && CharacterState == ECharacterState::ECS_Crouching)
 	{
-		CameraBoom->AddWorldOffset(FVector(0.f, 0.f, CrouchHeight));
+		FirstPersonCamera->AddWorldOffset(FVector(0.f, 0.f, CrouchHeight));
 		CharacterState = ECharacterState::ECS_Idle;
 		GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 	}
@@ -201,7 +185,15 @@ void APlayerCharacter::Crouch()
 
 void APlayerCharacter::Attack()
 {
-	if (bIsHoldingWeapon || bHasPowerWeapon)
+	if (bIsHoldingWeapon && HeldWeapon)
+	{
+		WeaponInterface->AttackTriggered();
+	}
+}
+
+void APlayerCharacter::PowerAttack()
+{
+	if (bHasPowerWeapon && HeldPowerWeapon)
 	{
 
 	}
@@ -237,45 +229,67 @@ void APlayerCharacter::FinishedSprint()
 
 void APlayerCharacter::EKeyPressed()
 {
-	IInteractionInterface* InteractionInterface = Cast<IInteractionInterface>(InteractionHit.GetActor());
-	if (InteractionInterface) //We have an item in view
+	IInteractionInterface* InteractionInterface = Cast<IInteractionInterface>(InteractionHit.GetActor()); //We have an item in view
+	if (InteractionInterface) 
 	{
 		ABaseWeapon* Weapon = Cast<ABaseWeapon>(InteractionHit.GetActor()); //We have a weapon in view
 		if (Weapon)
 		{
 			//WeaponClass = Weapon->Tag
-			if (!bIsHoldingWeapon && !Weapon->ActorHasTag("Power"))
+			if (!bIsHoldingWeapon && ComponentToEquipTo && !Weapon->ActorHasTag("Power"))
 			{
 				bIsHoldingWeapon = true;
-				Weapon->Equip(GetMesh(), FName(WeaponSocket), this, this);
-				WeaponInView = nullptr;
+				USceneComponent* WeaponRoot = Weapon->GetRootComponent();
+				if (WeaponRoot)
+				{
+					Weapon->Equip(ComponentToEquipTo, FName(WeaponSocket), this, this);
+					FTransform WeaponSocketTranform = Weapon->GetItemMesh()->GetSocketTransform(Weapon->GetGripSocket(), RTS_Component);
+					
+					FTransform OffsetTransform = WeaponSocketTranform.Inverse(); //Inverting because the grip might be at 10,0,0 but relative to the root it's at -10,0,0
+
+					WeaponRoot->SetRelativeTransform(OffsetTransform);
+				}
 				ActorsToIgnore.Add(Weapon);
 				HeldWeapon = Weapon;
+				WeaponInterface = Cast<IWeaponInterface>(HeldWeapon);
 
 				if (HeldWeapon->ActorHasTag("HitScan"))
 				{
-					WeaponHeld = EWeaponHeld::EWH_HitScan;
+					WeaponClass = EWeaponHeld::EWH_HitScan;
 				}
 				if (HeldWeapon->ActorHasTag("Projectile"))
 				{
-					WeaponHeld = EWeaponHeld::EWH_Projectile;
+					WeaponClass = EWeaponHeld::EWH_Projectile;
 				}
 				if (HeldWeapon->ActorHasTag("Melee"))
 				{
-					WeaponHeld = EWeaponHeld::EWH_Melee;
+					WeaponClass = EWeaponHeld::EWH_Melee;
 				}
 			}
 			
-			if (!bHasPowerWeapon && Weapon->ActorHasTag("Power"))
+			if (!bHasPowerWeapon && ComponentToEquipTo && Weapon->ActorHasTag("Power"))
 			{
 				bHasPowerWeapon = true;
-				Weapon->Equip(GetMesh(), FName(PowerSocket), this, this);
-				WeaponInView = nullptr;
+				Weapon->Equip(ComponentToEquipTo, FName(PowerSocket), this, this);
+				HeldPowerWeapon = Weapon;
+				WeaponInterface = Cast<IWeaponInterface>(HeldWeapon);
 				ActorsToIgnore.Add(Weapon);
 			}
 		}
-	}
-	
+
+		APickups* Pickup = Cast<APickups>(InteractionHit.GetActor()); //We have a pickup in view
+		if (Pickup)
+		{
+			Pickup->InteractAction();
+			Attributes->AddBoost(Pickup->GetBoostType(), Pickup->GetBoostAmount());
+		}
+
+		ASimpleInteractable* SimIntObject = Cast<ASimpleInteractable>(InteractionHit.GetActor()); //We have a simple interactable object in view
+		if (SimIntObject)
+		{
+			SimIntObject->InteractAction();
+		}
+	}	
 }
 
 void APlayerCharacter::InteractionTrace(FHitResult& SphereHitResult)
@@ -283,7 +297,28 @@ void APlayerCharacter::InteractionTrace(FHitResult& SphereHitResult)
 	const FVector Start = FirstPersonCamera->GetComponentLocation();
 	const FVector End = Start + (FirstPersonCamera->GetForwardVector() * InteractRange);
 
-	UKismetSystemLibrary::SphereTraceSingle(this, Start, End, CrosshairRadius, ETraceTypeQuery::TraceTypeQuery1, false, ActorsToIgnore, bShowInteractionDebug ? EDrawDebugTrace::ForDuration : EDrawDebugTrace::None, SphereHitResult, true);
+	if (UKismetSystemLibrary::SphereTraceSingle(this, Start, End, CrosshairRadius, ETraceTypeQuery::TraceTypeQuery1, false, ActorsToIgnore, bShowInteractionDebug ? EDrawDebugTrace::ForDuration : EDrawDebugTrace::None, SphereHitResult, true))
+	{
+		SetItemLookedAt(InteractionHit);
+	}
+}
+
+void APlayerCharacter::SetItemLookedAt(FHitResult& LookTraceResult)
+{
+	TObjectPtr<AActor> HitActor = LookTraceResult.GetActor();
+	if (HitActor != LastSeenActor)
+	{
+		//The looked at object has changed
+		LastSeenActor = HitActor;
+		ItemInView = nullptr;
+
+		if (HitActor && HitActor->IsA<ABaseItem>())
+		{
+			ItemInView = Cast<ABaseItem>(HitActor); //Current Item Looked At
+			UE_LOG(LogTemp, Warning, TEXT("%s"), *ItemInView.GetName());
+		}
+	}
+	
 }
 
 bool APlayerCharacter::CanSprint()

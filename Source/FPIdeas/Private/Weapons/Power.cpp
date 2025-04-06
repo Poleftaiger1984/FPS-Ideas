@@ -3,6 +3,10 @@
 
 #include "Weapons/Power.h"
 
+void APower::AttackTriggered()
+{
+}
+
 void APower::BeginPlay()
 {
 	Super::BeginPlay();

@@ -2,7 +2,7 @@
 
 
 #include "Weapons/BaseWeapon.h"
-#include "Interfaces/IPickupInterface.h"
+#include "Interfaces/HitInterface.h"
 
 ABaseWeapon::ABaseWeapon()
 {
@@ -19,12 +19,12 @@ void ABaseWeapon::Equip(TObjectPtr<USceneComponent> ComponentToEquipTo, FName Eq
 {
 	SetOwner(NewOwner);
 	SetInstigator(NewInstigator);
-	AttackMeshToSocket(ComponentToEquipTo, EquipSocket);
-
+	AttachMeshToSocket(ComponentToEquipTo, EquipSocket);
+	
 	//if(NewOwner->ActorHasTag(FName("Player"))) Play Sound;
 }
 
-void ABaseWeapon::AttackMeshToSocket(TObjectPtr<USceneComponent> MeshToAttachTo, const FName EquipSocket)
+void ABaseWeapon::AttachMeshToSocket(TObjectPtr<USceneComponent> MeshToAttachTo, const FName EquipSocket)
 {
 	FAttachmentTransformRules SocketRules(EAttachmentRule::SnapToTarget, true);
 	ItemMesh->AttachToComponent(MeshToAttachTo, SocketRules, EquipSocket);
@@ -33,4 +33,14 @@ void ABaseWeapon::AttackMeshToSocket(TObjectPtr<USceneComponent> MeshToAttachTo,
 void ABaseWeapon::BeginPlay()
 {
 	Super::BeginPlay();
+}
+
+void ABaseWeapon::ExecuteGetHit(FHitResult& TraceResult)
+{
+	IHitInterface* HitInterface = Cast<IHitInterface>(TraceResult.GetActor());
+	if (HitInterface)
+	{
+		// Execute_GetHit is automatically generated and is the only way to call a BlueprintNativeFunction in C++
+		HitInterface->Execute_GetHit(TraceResult.GetActor(), TraceResult.ImpactPoint, GetOwner());
+	}
 }
